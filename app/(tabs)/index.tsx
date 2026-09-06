@@ -1,103 +1,144 @@
-import { useState } from 'react';
-import { Alert, FlatList, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-
-type Task = {
-  id: string;
-  text: string;
-  completed: boolean;
-};
+import { useFocusEffect } from 'expo-router';
+import { useCallback, useState } from 'react';
+import { Alert, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import DraggableFlatList, { RenderItemParams, ScaleDecorator } from 'react-native-draggable-flatlist';
+import {
+  Task,
+  addTaskDb,
+  deleteTaskDb,
+  getAllTasks,
+  initDatabase,
+  reorderTasks,
+  toggleTaskComplete,
+  updateTaskText,
+} from '../../db';
 
 export default function HomeScreen() {
   const [task, setTask] = useState('');
   const [tasks, setTasks] = useState<Task[]>([]);
-  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<number | null>(null);
 
-  // Agregar tarea
+  const loadTasks = () => {
+    setTasks(getAllTasks());
+  };
+
+  useFocusEffect(
+    useCallback(() => {
+      initDatabase();
+      loadTasks();
+    }, [])
+  );
+
   const addTask = () => {
     if (task.trim() === '') return;
-
-    const newTask: Task = {
-      id: Date.now().toString(),
-      text: task.trim(),
-      completed: false,
-    };
-
-    setTasks([...tasks, newTask]);
+    addTaskDb(task.trim());
     setTask('');
     setEditingId(null);
+    loadTasks();
   };
 
-  // Marcar como completada
-  const toggleComplete = (id: string) => {
-    setTasks(tasks.map(t => 
-      t.id === id ? { ...t, completed: !t.completed } : t
-    ));
+  const toggleComplete = (id: number, current: boolean) => {
+    toggleTaskComplete(id, !current);
+    loadTasks();
   };
 
-  // Iniciar edición (PROTEGIDO)
   const startEditing = (taskToEdit: Task) => {
     if (taskToEdit.completed) return;
-
     setTask(taskToEdit.text);
     setEditingId(taskToEdit.id);
   };
 
-  // Guardar edición
   const saveEdit = () => {
-    if (task.trim() === '' || !editingId) return;
-
-    setTasks(tasks.map(t => 
-      t.id === editingId ? { ...t, text: task.trim() } : t
-    ));
-
+    if (task.trim() === '' || editingId === null) return;
+    updateTaskText(editingId, task.trim());
     setTask('');
     setEditingId(null);
+    loadTasks();
   };
 
-  // Cancelar edición
   const cancelEdit = () => {
     setTask('');
     setEditingId(null);
   };
 
-  // Eliminar tarea
-  const deleteTask = (id: string) => {
+  const deleteTask = (id: number) => {
     Alert.alert(
       'Eliminar tarea',
       '¿Estás seguro?',
       [
         { text: 'Cancelar', style: 'cancel' },
-        { 
-          text: 'Eliminar', 
+        {
+          text: 'Eliminar',
           style: 'destructive',
-          onPress: () => setTasks(tasks.filter(t => t.id !== id)) 
+          onPress: () => {
+            deleteTaskDb(id);
+            loadTasks();
+          },
         },
       ]
     );
   };
 
-  // Mover tarea hacia arriba
-  const moveUp = (index: number) => {
-    if (index === 0) return;
-
-    const newTasks = [...tasks];
-    [newTasks[index - 1], newTasks[index]] = [newTasks[index], newTasks[index - 1]];
-    setTasks(newTasks);
+  const handleDragEnd = ({ data }: { data: Task[] }) => {
+    setTasks(data);
+    reorderTasks(data.map((t) => t.id));
   };
 
-  // Mover tarea hacia abajo
-  const moveDown = (index: number) => {
-    if (index === tasks.length - 1) return;
+  const renderItem = ({ item, drag, isActive }: RenderItemParams<Task>) => (
+    <ScaleDecorator>
+      <TouchableOpacity
+        style={[styles.taskRow, isActive && styles.taskRowActive]}
+        onLongPress={drag}
+        delayLongPress={100}
+        disabled={isActive}
+        activeOpacity={1}
+      >
+        <TouchableOpacity
+          style={[styles.checkbox, item.completed && styles.checkboxChecked]}
+          onPress={() => toggleComplete(item.id, item.completed)}
+          activeOpacity={0.8}
+        >
+          {item.completed && <Text style={styles.checkIcon}>✓</Text>}
+        </TouchableOpacity>
 
-    const newTasks = [...tasks];
-    [newTasks[index + 1], newTasks[index]] = [newTasks[index], newTasks[index + 1]];
-    setTasks(newTasks);
-  };
+        <View style={styles.task}>
+          <Text style={[styles.taskText, item.completed && styles.taskCompleted]}>
+            {item.text}
+          </Text>
+        </View>
+
+        <View style={styles.actions}>
+          <TouchableOpacity
+            style={styles.actionButton}
+            onPress={() => {
+              if (!item.completed) {
+                startEditing(item);
+              }
+            }}
+            activeOpacity={item.completed ? 1 : 0.7}
+            disabled={item.completed}
+          >
+            <Text style={[styles.editText, item.completed && { opacity: 0.3 }]}>
+              Editar
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.actionButton, styles.deleteButton]}
+            onPress={() => deleteTask(item.id)}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.deleteText}>Eliminar</Text>
+          </TouchableOpacity>
+        </View>
+      </TouchableOpacity>
+    </ScaleDecorator>
+  );
 
   return (
     <View style={styles.container}>
       <Text style={styles.title}>
-        {editingId ? '✏️ Editando tarea' : 'Mi Primera App Celular - De Tareas'}
+        {editingId ? 'Editando tarea' : 'Mi Primera App Celular - De Tareas'}
       </Text>
 
       <TextInput
@@ -113,7 +154,7 @@ export default function HomeScreen() {
         {editingId ? (
           <>
             <TouchableOpacity style={[styles.button, styles.buttonSave]} onPress={saveEdit}>
-              <Text style={styles.buttonText}>✅ Guardar</Text>
+              <Text style={styles.buttonText}>Guardar</Text>
             </TouchableOpacity>
             <TouchableOpacity style={[styles.button, styles.buttonCancel]} onPress={cancelEdit}>
               <Text style={styles.buttonText}>Cancelar</Text>
@@ -121,82 +162,24 @@ export default function HomeScreen() {
           </>
         ) : (
           <TouchableOpacity style={styles.button} onPress={addTask}>
-            <Text style={styles.buttonText}> Agregar</Text>
+            <Text style={styles.buttonText}>Agregar</Text>
           </TouchableOpacity>
         )}
       </View>
 
-      <FlatList
-        data={tasks}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item, index }) => (
-          <View style={styles.taskRow}>
-            
-            {/* Checkbox */}
-            <TouchableOpacity 
-              style={[styles.checkbox, item.completed && styles.checkboxChecked]}
-              onPress={() => toggleComplete(item.id)}
-              activeOpacity={0.8}
-            >
-              {item.completed && <Text style={styles.checkIcon}>✓</Text>}
-            </TouchableOpacity>
-
-            {/* Texto */}
-            <View style={styles.task}>
-              <Text style={[styles.taskText, item.completed && styles.taskCompleted]}>
-                {item.text}
-              </Text>
-            </View>
-
-            {/* Flechas */}
-            <View style={styles.arrows}>
-              <TouchableOpacity onPress={() => moveUp(index)}>
-                <Text style={styles.arrow}>⬆️</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => moveDown(index)}>
-                <Text style={styles.arrow}>⬇️</Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* Acciones */}
-            <View style={styles.actions}>
-              <TouchableOpacity 
-                style={styles.actionButton}
-                onPress={() => {
-                  if (!item.completed) {
-                    startEditing(item);
-                  }
-                }}
-                activeOpacity={item.completed ? 1 : 0.7}
-                disabled={item.completed}
-              >
-                <Text 
-                  style={[
-                    styles.editIcon,
-                    item.completed && { opacity: 0.3 }
-                  ]}
-                >
-                  ✏️
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity 
-                style={[styles.actionButton, styles.deleteButton]}
-                onPress={() => deleteTask(item.id)}
-                activeOpacity={0.7}
-              >
-                <Text style={styles.deleteIcon}>🗑️</Text>
-              </TouchableOpacity>
-            </View>
-
-          </View>
-        )}
-        ListEmptyComponent={
-          <Text style={styles.emptyText}>
-            No hay tareas aún. ¡Agrega una!
-          </Text>
-        }
-      />
+      {tasks.length === 0 ? (
+        <Text style={styles.emptyText}>No hay tareas aún. ¡Agrega una!</Text>
+      ) : (
+        <>
+          <Text style={styles.hint}>Mantén presionada una tarea para reordenarla</Text>
+          <DraggableFlatList
+            data={tasks}
+            onDragEnd={handleDragEnd}
+            keyExtractor={(item) => item.id.toString()}
+            renderItem={renderItem}
+          />
+        </>
+      )}
     </View>
   );
 }
@@ -228,7 +211,7 @@ const styles = StyleSheet.create({
   buttonRow: {
     flexDirection: 'row',
     gap: 10,
-    marginBottom: 25,
+    marginBottom: 15,
   },
   button: {
     flex: 1,
@@ -248,6 +231,13 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     fontSize: 16,
   },
+  hint: {
+    color: '#64748b',
+    fontSize: 12,
+    textAlign: 'center',
+    marginBottom: 10,
+    fontStyle: 'italic',
+  },
   taskRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -256,6 +246,11 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     paddingVertical: 12,
     paddingHorizontal: 12,
+  },
+  taskRowActive: {
+    backgroundColor: '#273449',
+    borderWidth: 1,
+    borderColor: '#4f46e5',
   },
   checkbox: {
     width: 24,
@@ -288,33 +283,30 @@ const styles = StyleSheet.create({
     color: '#94a3b8',
     opacity: 0.8,
   },
-  arrows: {
-    marginRight: 10,
-  },
-  arrow: {
-    fontSize: 18,
-    marginVertical: 2,
-  },
   actions: {
     flexDirection: 'row',
     borderLeftWidth: 1,
     borderLeftColor: '#334155',
   },
   actionButton: {
-    width: 55,
+    paddingHorizontal: 10,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  editIcon: {
-    fontSize: 20,
+  editText: {
+    fontSize: 13,
     color: '#2563eb',
+    fontWeight: '600',
   },
   deleteButton: {
     backgroundColor: '#dc2626',
+    borderRadius: 8,
+    marginLeft: 6,
   },
-  deleteIcon: {
-    fontSize: 20,
+  deleteText: {
+    fontSize: 13,
     color: 'white',
+    fontWeight: '600',
   },
   emptyText: {
     color: '#64748b',
