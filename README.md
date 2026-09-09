@@ -1,50 +1,60 @@
-# Welcome to your Expo app 👋
+# Mis Tareas
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Aplicación móvil de gestión de tareas con persistencia local en SQLite y generación de reportes en PDF.
 
-## Get started
+## Descripción
 
-1. Install dependencies
+Una aplicación de tipo to-do list que permite crear, editar, completar y eliminar tareas, organizarlas por prioridad y categoría, asignarles fecha límite, y generar un reporte exportable en PDF con el estado general de las tareas.
 
-   ```bash
+## Tecnologías utilizadas
+
+- React Native
+- Expo (Expo Router)
+- TypeScript
+- SQLite (expo-sqlite)
+- expo-print / expo-sharing (generación y exportación de reportes PDF)
+- expo-file-system
+
+## Funcionalidades
+
+- CRUD completo de tareas (crear, leer, actualizar, eliminar)
+- Persistencia de datos en base de datos SQLite local
+- Prioridad de tareas (alta, media, baja)
+- Categorías de tareas (trabajo, estudio, personal, hogar)
+- Fecha límite por tarea, con aviso visual de tareas vencidas
+- Reprogramación rápida de tareas vencidas
+- Ordenamiento automático: tareas vencidas primero, luego por prioridad, luego por fecha límite; tareas completadas al final
+- Filtro de tareas por categoría
+- Contador y barra de progreso de tareas completadas
+- Pantalla de reportes con estadísticas (totales, por prioridad, por categoría)
+- Generación y exportación de reporte en PDF
+
+## Estructura del proyecto
+
+    mi-primera-app/
+    |-- app/
+    |   |-- (tabs)/
+    |   |   |-- index.tsx        (Pantalla principal, lista de tareas)
+    |   |   |-- explore.tsx      (Pantalla de reportes y estadisticas)
+    |   |   |-- _layout.tsx      (Configuracion de las pestanas)
+    |   |-- _layout.tsx           (Layout raiz de la aplicacion)
+    |-- db.ts                     (Logica de acceso a la base de datos SQLite)
+    |-- pdf.ts                    (Generacion del reporte en PDF)
+    |-- components/               (Componentes reutilizables)
+
+## Instalacion y ejecucion
+
+1. Instalar dependencias:
+
    npm install
-   ```
 
-2. Start the app
+2. Iniciar el proyecto:
 
-   ```bash
    npx expo start
-   ```
 
-In the output, you'll find options to open the app in a
+3. Escanear el codigo QR con la aplicacion Expo Go (Android/iOS), o presionar la tecla "a" para abrir en un emulador de Android.
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+## Requisitos previos
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
-
-```bash
-npm run reset-project
-```
-
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
-
-## Learn more
-
-To learn more about developing your project with Expo, look at the following resources:
-
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
-
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+- Node.js instalado
+- Aplicacion Expo Go instalada en el celular (o un emulador de Android/iOS configurado)
