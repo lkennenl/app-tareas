@@ -18,6 +18,9 @@ export type TaskStats = {
   completed: number;
 };
 
+export type CategoryCount = { category: Category; count: number };
+export type PriorityCount = { priority: Priority; count: number };
+
 const db = SQLite.openDatabaseSync("tareas.db");
 
 export function initDatabase() {
@@ -56,6 +59,7 @@ export function getAllTasks(): Task[] {
   const rows = db.getAllSync<any>(`
     SELECT * FROM tasks
     ORDER BY
+      completed ASC,
       CASE WHEN dueDate IS NOT NULL AND dueDate < date('now') AND completed = 0 THEN 0 ELSE 1 END ASC,
       CASE priority WHEN 'alta' THEN 0 WHEN 'media' THEN 1 ELSE 2 END ASC,
       CASE WHEN dueDate IS NULL THEN 1 ELSE 0 END ASC,
@@ -80,6 +84,33 @@ export function getTaskStats(): TaskStats {
     total: row?.total ?? 0,
     completed: row?.completed ?? 0,
   };
+}
+
+export function getCountsByCategory(): CategoryCount[] {
+  const rows = db.getAllSync<any>(
+    "SELECT category, COUNT(*) as count FROM tasks GROUP BY category;",
+  );
+  return rows.map((r) => ({
+    category: r.category as Category,
+    count: r.count,
+  }));
+}
+
+export function getCountsByPriority(): PriorityCount[] {
+  const rows = db.getAllSync<any>(
+    "SELECT priority, COUNT(*) as count FROM tasks GROUP BY priority;",
+  );
+  return rows.map((r) => ({
+    priority: r.priority as Priority,
+    count: r.count,
+  }));
+}
+
+export function getOverdueCount(): number {
+  const row = db.getFirstSync<any>(
+    `SELECT COUNT(*) as count FROM tasks WHERE dueDate IS NOT NULL AND dueDate < date('now') AND completed = 0;`,
+  );
+  return row?.count ?? 0;
 }
 
 export function addTaskDb(
