@@ -1,6 +1,7 @@
 import { useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
 import {
+  Alert,
   ScrollView,
   StyleSheet,
   Text,
@@ -13,12 +14,14 @@ import {
   Priority,
   PriorityCount,
   TaskStats,
+  getAllTasks,
   getCountsByCategory,
   getCountsByPriority,
   getOverdueCount,
   getTaskStats,
   initDatabase,
 } from "../../db";
+import { generateAndShareReport } from "../../pdf";
 
 const PRIORITY_COLORS: Record<Priority, string> = {
   alta: "#dc2626",
@@ -69,6 +72,23 @@ export default function ReportsScreen() {
   const pending = stats.total - stats.completed;
   const maxCategoryCount = Math.max(1, ...categoryCounts.map((c) => c.count));
   const maxPriorityCount = Math.max(1, ...priorityCounts.map((p) => p.count));
+
+  const handleGenerateReport = async () => {
+    try {
+      const tasks = getAllTasks();
+      if (tasks.length === 0) {
+        Alert.alert(
+          "Sin tareas",
+          "No hay tareas registradas para generar el reporte.",
+        );
+        return;
+      }
+      await generateAndShareReport(tasks);
+    } catch (error) {
+      console.error("Error al generar el reporte:", error);
+      Alert.alert("Error", "No se pudo generar el reporte. Intenta de nuevo.");
+    }
+  };
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -149,9 +169,8 @@ export default function ReportsScreen() {
         )}
       </View>
 
-      <TouchableOpacity style={styles.pdfButton} disabled>
+      <TouchableOpacity style={styles.pdfButton} onPress={handleGenerateReport}>
         <Text style={styles.pdfButtonText}>Generar reporte PDF</Text>
-        <Text style={styles.pdfButtonHint}>(próximamente)</Text>
       </TouchableOpacity>
     </ScrollView>
   );
@@ -244,20 +263,14 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
   pdfButton: {
-    backgroundColor: "#334155",
+    backgroundColor: "#2563eb",
     borderRadius: 12,
     paddingVertical: 16,
     alignItems: "center",
-    opacity: 0.6,
   },
   pdfButtonText: {
     color: "white",
     fontWeight: "bold",
     fontSize: 16,
-  },
-  pdfButtonHint: {
-    color: "#94a3b8",
-    fontSize: 12,
-    marginTop: 2,
   },
 });
