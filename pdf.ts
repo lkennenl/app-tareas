@@ -39,11 +39,17 @@ function buildHtml(tasks: Task[]): string {
   const completed = tasks.filter((t) => t.completed).length;
   const pending = total - completed;
   const overdue = tasks.filter((t) => isOverdue(t.dueDate, t.completed)).length;
+  const completionRate = total === 0 ? 0 : (completed / total) * 100;
 
   const generatedAt = new Date().toLocaleString("es-CO", {
     dateStyle: "long",
     timeStyle: "short",
   });
+
+  const summaryText =
+    total === 0
+      ? "No hay tareas registradas en este momento."
+      : `Este reporte incluye un total de ${total} tarea${total === 1 ? "" : "s"}, de las cuales ${completed} ${completed === 1 ? "ha sido completada" : "han sido completadas"} y ${pending} ${pending === 1 ? "permanece pendiente" : "permanecen pendientes"}.${overdue > 0 ? ` De las pendientes, ${overdue} ${overdue === 1 ? "se encuentra vencida" : "se encuentran vencidas"}.` : ""}`;
 
   const rows = tasks
     .map((t) => {
@@ -68,36 +74,51 @@ function buildHtml(tasks: Task[]): string {
           body {
             font-family: Helvetica, Arial, sans-serif;
             color: #1e293b;
-            padding: 24px;
+            padding: 28px;
           }
           h1 {
-            font-size: 20px;
+            font-size: 28px;
+            font-weight: bold;
             margin-bottom: 2px;
+            color: #0f172a;
           }
           .subtitle {
             font-size: 11px;
             color: #64748b;
-            margin-bottom: 20px;
+            margin-bottom: 18px;
+          }
+          .summary-text {
+            font-size: 12px;
+            color: #334155;
+            line-height: 1.5;
+            margin-bottom: 22px;
+            padding: 12px 14px;
+            background-color: #f8fafc;
+            border-left: 3px solid #2563eb;
+            border-radius: 4px;
           }
           .summary {
             display: flex;
-            gap: 16px;
-            margin-bottom: 24px;
+            gap: 14px;
+            margin-bottom: 26px;
           }
           .summary-item {
+            flex: 1;
             border: 1px solid #cbd5e1;
-            border-radius: 6px;
-            padding: 8px 14px;
+            border-radius: 8px;
+            padding: 16px 10px;
             text-align: center;
           }
           .summary-item .number {
-            font-size: 18px;
+            font-size: 24px;
             font-weight: bold;
             display: block;
           }
           .summary-item .label {
             font-size: 10px;
             color: #64748b;
+            text-transform: uppercase;
+            margin-top: 4px;
           }
           table {
             width: 100%;
@@ -106,7 +127,7 @@ function buildHtml(tasks: Task[]): string {
           }
           th, td {
             border: 1px solid #cbd5e1;
-            padding: 6px 8px;
+            padding: 7px 9px;
             text-align: left;
           }
           th {
@@ -128,22 +149,28 @@ function buildHtml(tasks: Task[]): string {
         <h1>Reporte de tareas</h1>
         <div class="subtitle">Generado el ${generatedAt}</div>
 
+        <div class="summary-text">${summaryText}</div>
+
         <div class="summary">
           <div class="summary-item">
             <span class="number">${total}</span>
             <span class="label">Total</span>
           </div>
           <div class="summary-item">
-            <span class="number">${completed}</span>
+            <span class="number" style="color:#22c55e">${completed}</span>
             <span class="label">Completadas</span>
           </div>
           <div class="summary-item">
-            <span class="number">${pending}</span>
+            <span class="number" style="color:#f59e0b">${pending}</span>
             <span class="label">Pendientes</span>
           </div>
           <div class="summary-item">
-            <span class="number">${overdue}</span>
+            <span class="number" style="color:#dc2626">${overdue}</span>
             <span class="label">Vencidas</span>
+          </div>
+          <div class="summary-item">
+            <span class="number" style="color:#2563eb">${completionRate.toFixed(1)}%</span>
+            <span class="label">Completado</span>
           </div>
         </div>
 
