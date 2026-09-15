@@ -313,31 +313,6 @@ export default function HomeScreen() {
             )}
           </View>
 
-          {showDatePicker && (
-            <>
-              {Platform.OS === "ios" && (
-                <TouchableOpacity
-                  style={styles.pickerDoneButton}
-                  onPress={closeInlinePicker}
-                >
-                  <Text style={styles.pickerDoneText}>Listo</Text>
-                </TouchableOpacity>
-              )}
-              <DateTimePicker
-                value={
-                  reschedulingId !== null
-                    ? new Date()
-                    : dueDate
-                      ? new Date(dueDate + "T00:00:00")
-                      : new Date()
-                }
-                mode="date"
-                display={Platform.OS === "ios" ? "inline" : "default"}
-                onChange={onDateChange}
-              />
-            </>
-          )}
-
           <View style={styles.buttonRow}>
             {editingId ? (
               <>
@@ -360,6 +335,31 @@ export default function HomeScreen() {
               </TouchableOpacity>
             )}
           </View>
+        </>
+      )}
+
+      {showDatePicker && (
+        <>
+          {Platform.OS === "ios" && (
+            <TouchableOpacity
+              style={styles.pickerDoneButton}
+              onPress={closeInlinePicker}
+            >
+              <Text style={styles.pickerDoneText}>Listo</Text>
+            </TouchableOpacity>
+          )}
+          <DateTimePicker
+            value={
+              reschedulingId !== null
+                ? new Date()
+                : dueDate
+                  ? new Date(dueDate + "T00:00:00")
+                  : new Date()
+            }
+            mode="date"
+            display={Platform.OS === "ios" ? "inline" : "default"}
+            onChange={onDateChange}
+          />
         </>
       )}
 
