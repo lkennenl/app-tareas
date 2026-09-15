@@ -87,6 +87,7 @@ export default function HomeScreen() {
   const [stats, setStats] = useState<TaskStats>({ total: 0, completed: 0 });
   const [editingId, setEditingId] = useState<number | null>(null);
   const [filter, setFilter] = useState<CategoryFilter>("todas");
+  const [formExpanded, setFormExpanded] = useState(false);
 
   const loadTasks = () => {
     setTasks(getAllTasks());
@@ -106,6 +107,7 @@ export default function HomeScreen() {
     setCategory("personal");
     setDueDate(null);
     setEditingId(null);
+    setFormExpanded(false);
   };
 
   const addTask = () => {
@@ -127,6 +129,7 @@ export default function HomeScreen() {
     setCategory(taskToEdit.category);
     setDueDate(taskToEdit.dueDate);
     setEditingId(taskToEdit.id);
+    setFormExpanded(true);
   };
 
   const saveEdit = () => {
@@ -188,6 +191,14 @@ export default function HomeScreen() {
     setReschedulingId(null);
   };
 
+  const toggleForm = () => {
+    if (formExpanded) {
+      resetForm();
+    } else {
+      setFormExpanded(true);
+    }
+  };
+
   const filteredTasks =
     filter === "todas" ? tasks : tasks.filter((t) => t.category === filter);
 
@@ -213,133 +224,144 @@ export default function HomeScreen() {
         </View>
       )}
 
-      <TextInput
-        style={styles.input}
-        placeholder="Escribe una tarea..."
-        placeholderTextColor="#94a3b8"
-        value={task}
-        onChangeText={setTask}
-        onSubmitEditing={editingId ? saveEdit : addTask}
-      />
+      <TouchableOpacity style={styles.formToggle} onPress={toggleForm}>
+        <Text style={styles.formToggleText}>
+          {formExpanded ? "Cerrar formulario" : "Agregar tarea"}
+        </Text>
+        <Text style={styles.formToggleIcon}>{formExpanded ? "▲" : "▼"}</Text>
+      </TouchableOpacity>
 
-      <Text style={styles.sectionLabel}>Prioridad</Text>
-      <View style={styles.optionRow}>
-        {PRIORITIES.map((p) => (
-          <TouchableOpacity
-            key={p}
-            style={[
-              styles.optionButton,
-              { borderColor: PRIORITY_COLORS[p] },
-              priority === p && { backgroundColor: PRIORITY_COLORS[p] },
-            ]}
-            onPress={() => setPriority(p)}
-          >
-            <Text
-              style={[
-                styles.optionButtonText,
-                { color: priority === p ? "white" : PRIORITY_COLORS[p] },
-              ]}
-            >
-              {PRIORITY_LABELS[p]}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      <Text style={styles.sectionLabel}>Categoría</Text>
-      <View style={styles.optionRow}>
-        {CATEGORIES.map((c) => (
-          <TouchableOpacity
-            key={c}
-            style={[
-              styles.optionButton,
-              { borderColor: CATEGORY_COLORS[c] },
-              category === c && { backgroundColor: CATEGORY_COLORS[c] },
-            ]}
-            onPress={() => setCategory(c)}
-          >
-            <Text
-              style={[
-                styles.optionButtonText,
-                { color: category === c ? "white" : CATEGORY_COLORS[c] },
-              ]}
-            >
-              {CATEGORY_LABELS[c]}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      <Text style={styles.sectionLabel}>Fecha límite (opcional)</Text>
-      <View style={styles.dateRow}>
-        <TouchableOpacity
-          style={styles.dateButton}
-          onPress={() => {
-            setReschedulingId(null);
-            setShowDatePicker(true);
-          }}
-        >
-          <Text style={styles.dateButtonText}>
-            {dueDate ? formatDisplayDate(dueDate) : "Sin fecha"}
-          </Text>
-        </TouchableOpacity>
-        {dueDate && (
-          <TouchableOpacity
-            style={styles.dateClearButton}
-            onPress={() => setDueDate(null)}
-          >
-            <Text style={styles.dateClearText}>Quitar</Text>
-          </TouchableOpacity>
-        )}
-      </View>
-
-      {showDatePicker && (
+      {formExpanded && (
         <>
-          {Platform.OS === "ios" && (
-            <TouchableOpacity
-              style={styles.pickerDoneButton}
-              onPress={closeInlinePicker}
-            >
-              <Text style={styles.pickerDoneText}>Listo</Text>
-            </TouchableOpacity>
-          )}
-          <DateTimePicker
-            value={
-              reschedulingId !== null
-                ? new Date()
-                : dueDate
-                  ? new Date(dueDate + "T00:00:00")
-                  : new Date()
-            }
-            mode="date"
-            display={Platform.OS === "ios" ? "inline" : "default"}
-            onChange={onDateChange}
+          <TextInput
+            style={styles.input}
+            placeholder="Escribe una tarea..."
+            placeholderTextColor="#94a3b8"
+            value={task}
+            onChangeText={setTask}
+            onSubmitEditing={editingId ? saveEdit : addTask}
           />
+
+          <Text style={styles.sectionLabel}>Prioridad</Text>
+          <View style={styles.optionRow}>
+            {PRIORITIES.map((p) => (
+              <TouchableOpacity
+                key={p}
+                style={[
+                  styles.optionButton,
+                  { borderColor: PRIORITY_COLORS[p] },
+                  priority === p && { backgroundColor: PRIORITY_COLORS[p] },
+                ]}
+                onPress={() => setPriority(p)}
+              >
+                <Text
+                  style={[
+                    styles.optionButtonText,
+                    { color: priority === p ? "white" : PRIORITY_COLORS[p] },
+                  ]}
+                >
+                  {PRIORITY_LABELS[p]}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          <Text style={styles.sectionLabel}>Categoría</Text>
+          <View style={styles.optionRow}>
+            {CATEGORIES.map((c) => (
+              <TouchableOpacity
+                key={c}
+                style={[
+                  styles.optionButton,
+                  { borderColor: CATEGORY_COLORS[c] },
+                  category === c && { backgroundColor: CATEGORY_COLORS[c] },
+                ]}
+                onPress={() => setCategory(c)}
+              >
+                <Text
+                  style={[
+                    styles.optionButtonText,
+                    { color: category === c ? "white" : CATEGORY_COLORS[c] },
+                  ]}
+                >
+                  {CATEGORY_LABELS[c]}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          <Text style={styles.sectionLabel}>Fecha límite (opcional)</Text>
+          <View style={styles.dateRow}>
+            <TouchableOpacity
+              style={styles.dateButton}
+              onPress={() => {
+                setReschedulingId(null);
+                setShowDatePicker(true);
+              }}
+            >
+              <Text style={styles.dateButtonText}>
+                {dueDate ? formatDisplayDate(dueDate) : "Sin fecha"}
+              </Text>
+            </TouchableOpacity>
+            {dueDate && (
+              <TouchableOpacity
+                style={styles.dateClearButton}
+                onPress={() => setDueDate(null)}
+              >
+                <Text style={styles.dateClearText}>Quitar</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {showDatePicker && (
+            <>
+              {Platform.OS === "ios" && (
+                <TouchableOpacity
+                  style={styles.pickerDoneButton}
+                  onPress={closeInlinePicker}
+                >
+                  <Text style={styles.pickerDoneText}>Listo</Text>
+                </TouchableOpacity>
+              )}
+              <DateTimePicker
+                value={
+                  reschedulingId !== null
+                    ? new Date()
+                    : dueDate
+                      ? new Date(dueDate + "T00:00:00")
+                      : new Date()
+                }
+                mode="date"
+                display={Platform.OS === "ios" ? "inline" : "default"}
+                onChange={onDateChange}
+              />
+            </>
+          )}
+
+          <View style={styles.buttonRow}>
+            {editingId ? (
+              <>
+                <TouchableOpacity
+                  style={[styles.button, styles.buttonSave]}
+                  onPress={saveEdit}
+                >
+                  <Text style={styles.buttonText}>Guardar</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.button, styles.buttonCancel]}
+                  onPress={cancelEdit}
+                >
+                  <Text style={styles.buttonText}>Cancelar</Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <TouchableOpacity style={styles.button} onPress={addTask}>
+                <Text style={styles.buttonText}>Agregar</Text>
+              </TouchableOpacity>
+            )}
+          </View>
         </>
       )}
-
-      <View style={styles.buttonRow}>
-        {editingId ? (
-          <>
-            <TouchableOpacity
-              style={[styles.button, styles.buttonSave]}
-              onPress={saveEdit}
-            >
-              <Text style={styles.buttonText}>Guardar</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.button, styles.buttonCancel]}
-              onPress={cancelEdit}
-            >
-              <Text style={styles.buttonText}>Cancelar</Text>
-            </TouchableOpacity>
-          </>
-        ) : (
-          <TouchableOpacity style={styles.button} onPress={addTask}>
-            <Text style={styles.buttonText}>Agregar</Text>
-          </TouchableOpacity>
-        )}
-      </View>
 
       <View style={styles.filterRow}>
         <TouchableOpacity
@@ -532,6 +554,25 @@ const styles = StyleSheet.create({
     backgroundColor: "#4f46e5",
     borderRadius: 4,
   },
+  formToggle: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    backgroundColor: "#1e293b",
+    borderRadius: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    marginBottom: 12,
+  },
+  formToggleText: {
+    color: "white",
+    fontSize: 15,
+    fontWeight: "600",
+  },
+  formToggleIcon: {
+    color: "#94a3b8",
+    fontSize: 12,
+  },
   input: {
     backgroundColor: "#1e293b",
     color: "white",
@@ -628,6 +669,7 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     gap: 8,
     marginBottom: 15,
+    marginTop: 4,
   },
   filterChip: {
     borderWidth: 1,
