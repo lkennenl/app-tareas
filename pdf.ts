@@ -22,6 +22,13 @@ const CATEGORY_LABELS: Record<Category, string> = {
   hogar: "Hogar",
 };
 
+const CATEGORY_COLORS: Record<Category, string> = {
+  trabajo: "#2563eb",
+  estudio: "#7c3aed",
+  personal: "#0d9488",
+  hogar: "#ca8a04",
+};
+
 function formatDisplayDate(iso: string | null): string {
   if (!iso) return "-";
   const [year, month, day] = iso.split("-");
@@ -58,7 +65,7 @@ function buildHtml(tasks: Task[]): string {
         <tr>
           <td>${t.text}</td>
           <td><span class="badge" style="color:${PRIORITY_COLORS[t.priority]}; border-color:${PRIORITY_COLORS[t.priority]}">${PRIORITY_LABELS[t.priority]}</span></td>
-          <td>${CATEGORY_LABELS[t.category]}</td>
+          <td><span class="badge" style="color:${CATEGORY_COLORS[t.category]}; border-color:${CATEGORY_COLORS[t.category]}">${CATEGORY_LABELS[t.category]}</span></td>
           <td>${formatDisplayDate(t.dueDate)}${overdueRow ? " (vencida)" : ""}</td>
           <td>${t.completed ? "Completada" : "Pendiente"}</td>
         </tr>
