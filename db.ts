@@ -11,6 +11,8 @@ export type Task = {
   priority: Priority;
   category: Category;
   dueDate: string | null;
+  createdAt: string | null;
+  completedAt: string | null;
 };
 
 export type TaskStats = {
@@ -20,6 +22,7 @@ export type TaskStats = {
 
 export type CategoryCount = { category: Category; count: number };
 export type PriorityCount = { priority: Priority; count: number };
+export type DayCompletionCount = { date: string; count: number };
 
 const db = SQLite.openDatabaseSync("tareas.db");
 
@@ -34,25 +37,19 @@ export function initDatabase() {
   `);
 
   const columns = db.getAllSync<any>("PRAGMA table_info(tasks);");
+  const columnNames = columns.map((col) => col.name);
 
-  const hasPriority = columns.some((col) => col.name === "priority");
-  if (!hasPriority) {
-    db.execSync(
-      `ALTER TABLE tasks ADD COLUMN priority TEXT NOT NULL DEFAULT 'media';`,
-    );
-  }
+  const ensureColumn = (name: string, definition: string) => {
+    if (!columnNames.includes(name)) {
+      db.execSync(`ALTER TABLE tasks ADD COLUMN ${name} ${definition};`);
+    }
+  };
 
-  const hasCategory = columns.some((col) => col.name === "category");
-  if (!hasCategory) {
-    db.execSync(
-      `ALTER TABLE tasks ADD COLUMN category TEXT NOT NULL DEFAULT 'personal';`,
-    );
-  }
-
-  const hasDueDate = columns.some((col) => col.name === "dueDate");
-  if (!hasDueDate) {
-    db.execSync(`ALTER TABLE tasks ADD COLUMN dueDate TEXT DEFAULT NULL;`);
-  }
+  ensureColumn("priority", "TEXT NOT NULL DEFAULT 'media'");
+  ensureColumn("category", "TEXT NOT NULL DEFAULT 'personal'");
+  ensureColumn("dueDate", "TEXT DEFAULT NULL");
+  ensureColumn("createdAt", "TEXT DEFAULT NULL");
+  ensureColumn("completedAt", "TEXT DEFAULT NULL");
 }
 
 export function getAllTasks(): Task[] {
@@ -73,6 +70,8 @@ export function getAllTasks(): Task[] {
     priority: r.priority as Priority,
     category: r.category as Category,
     dueDate: r.dueDate,
+    createdAt: r.createdAt ?? null,
+    completedAt: r.completedAt ?? null,
   }));
 }
 
@@ -113,6 +112,51 @@ export function getOverdueCount(): number {
   return row?.count ?? 0;
 }
 
+export function getCompletedThisWeek(): DayCompletionCount[] {
+  const now = new Date();
+  const dayOfWeek = now.getDay();
+  const diffToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+  const monday = new Date(now);
+  monday.setDate(now.getDate() - diffToMonday);
+
+  const weekDates: string[] = [];
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(monday);
+    d.setDate(monday.getDate() + i);
+    weekDates.push(
+      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`,
+    );
+  }
+
+  const rows = db.getAllSync<any>(
+    `SELECT date(completedAt, 'localtime') as date, COUNT(*) as count
+     FROM tasks
+     WHERE completedAt IS NOT NULL
+       AND date(completedAt, 'localtime') >= ?
+     GROUP BY date(completedAt, 'localtime');`,
+    [weekDates[0]],
+  );
+
+  const countByDate = new Map<string, number>();
+  rows.forEach((r) => countByDate.set(r.date, r.count));
+
+  return weekDates.map((date) => ({
+    date,
+    count: countByDate.get(date) ?? 0,
+  }));
+}
+
+export function getAvgCompletionHours(): number | null {
+  const row = db.getFirstSync<any>(`
+    SELECT AVG(
+      (julianday(completedAt) - julianday(createdAt)) * 24
+    ) as avgHours
+    FROM tasks
+    WHERE completedAt IS NOT NULL AND createdAt IS NOT NULL;
+  `);
+  return row?.avgHours ?? null;
+}
+
 export function addTaskDb(
   text: string,
   priority: Priority,
@@ -123,9 +167,10 @@ export function addTaskDb(
     "SELECT MAX(position) as maxPos FROM tasks;",
   );
   const nextPos = (maxPos?.maxPos ?? -1) + 1;
+  const now = new Date().toISOString();
   db.runSync(
-    "INSERT INTO tasks (text, completed, position, priority, category, dueDate) VALUES (?, 0, ?, ?, ?, ?);",
-    [text, nextPos, priority, category, dueDate],
+    "INSERT INTO tasks (text, completed, position, priority, category, dueDate, createdAt) VALUES (?, 0, ?, ?, ?, ?, ?);",
+    [text, nextPos, priority, category, dueDate, now],
   );
 }
 
@@ -147,8 +192,10 @@ export function updateTaskDueDate(id: number, dueDate: string | null) {
 }
 
 export function toggleTaskComplete(id: number, completed: boolean) {
-  db.runSync("UPDATE tasks SET completed = ? WHERE id = ?;", [
+  const completedAt = completed ? new Date().toISOString() : null;
+  db.runSync("UPDATE tasks SET completed = ?, completedAt = ? WHERE id = ?;", [
     completed ? 1 : 0,
+    completedAt,
     id,
   ]);
 }

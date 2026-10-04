@@ -11,10 +11,13 @@ import {
 import {
   Category,
   CategoryCount,
+  DayCompletionCount,
   Priority,
   PriorityCount,
   TaskStats,
   getAllTasks,
+  getAvgCompletionHours,
+  getCompletedThisWeek,
   getCountsByCategory,
   getCountsByPriority,
   getOverdueCount,
@@ -49,17 +52,40 @@ const CATEGORY_LABELS: Record<Category, string> = {
   hogar: "Hogar",
 };
 
+const WEEKDAY_LABELS = ["D", "L", "M", "X", "J", "V", "S"];
+
+function formatWeekdayLabel(iso: string): string {
+  const [year, month, day] = iso.split("-").map(Number);
+  const date = new Date(year, month - 1, day);
+  return WEEKDAY_LABELS[date.getDay()];
+}
+
+function formatAvgCompletionTime(hours: number | null): string {
+  if (hours === null) return "Sin datos aún";
+  if (hours < 1) return `${Math.round(hours * 60)} min`;
+  if (hours < 48) return `${hours.toFixed(1)} h`;
+  return `${(hours / 24).toFixed(1)} días`;
+}
+
 export default function ReportsScreen() {
   const [stats, setStats] = useState<TaskStats>({ total: 0, completed: 0 });
   const [categoryCounts, setCategoryCounts] = useState<CategoryCount[]>([]);
   const [priorityCounts, setPriorityCounts] = useState<PriorityCount[]>([]);
   const [overdueCount, setOverdueCount] = useState(0);
+  const [weeklyCompletions, setWeeklyCompletions] = useState<
+    DayCompletionCount[]
+  >([]);
+  const [avgCompletionHours, setAvgCompletionHours] = useState<number | null>(
+    null,
+  );
 
   const loadStats = () => {
     setStats(getTaskStats());
     setCategoryCounts(getCountsByCategory());
     setPriorityCounts(getCountsByPriority());
     setOverdueCount(getOverdueCount());
+    setWeeklyCompletions(getCompletedThisWeek());
+    setAvgCompletionHours(getAvgCompletionHours());
   };
 
   useFocusEffect(
@@ -169,6 +195,43 @@ export default function ReportsScreen() {
         )}
       </View>
 
+      <Text style={styles.sectionTitle}>Productividad semanal</Text>
+      <View style={styles.chartBlock}>
+        <View style={styles.weeklyRow}>
+          {weeklyCompletions.map((day) => {
+            const maxCount = Math.max(
+              1,
+              ...weeklyCompletions.map((d) => d.count),
+            );
+            const barHeight = (day.count / maxCount) * 60;
+            return (
+              <View key={day.date} style={styles.weeklyBarColumn}>
+                <Text style={styles.weeklyBarCount}>{day.count}</Text>
+                <View style={styles.weeklyBarTrack}>
+                  <View
+                    style={[
+                      styles.weeklyBarFill,
+                      { height: Math.max(barHeight, 2) },
+                    ]}
+                  />
+                </View>
+                <Text style={styles.weeklyBarLabel}>
+                  {formatWeekdayLabel(day.date)}
+                </Text>
+              </View>
+            );
+          })}
+        </View>
+        <View style={styles.avgCompletionRow}>
+          <Text style={styles.avgCompletionLabel}>
+            Tiempo promedio en completar una tarea
+          </Text>
+          <Text style={styles.avgCompletionValue}>
+            {formatAvgCompletionTime(avgCompletionHours)}
+          </Text>
+        </View>
+      </View>
+
       <TouchableOpacity style={styles.pdfButton} onPress={handleGenerateReport}>
         <Text style={styles.pdfButtonText}>Generar reporte PDF</Text>
       </TouchableOpacity>
@@ -261,6 +324,55 @@ const styles = StyleSheet.create({
     color: "#64748b",
     fontStyle: "italic",
     fontSize: 13,
+  },
+  weeklyRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-end",
+    marginBottom: 16,
+  },
+  weeklyBarColumn: {
+    alignItems: "center",
+    flex: 1,
+  },
+  weeklyBarCount: {
+    color: "#94a3b8",
+    fontSize: 10,
+    marginBottom: 4,
+  },
+  weeklyBarTrack: {
+    width: 14,
+    height: 60,
+    justifyContent: "flex-end",
+    backgroundColor: "#0f172a",
+    borderRadius: 6,
+    overflow: "hidden",
+  },
+  weeklyBarFill: {
+    width: "100%",
+    backgroundColor: "#4f46e5",
+    borderRadius: 6,
+  },
+  weeklyBarLabel: {
+    color: "#64748b",
+    fontSize: 11,
+    marginTop: 6,
+  },
+  avgCompletionRow: {
+    borderTopWidth: 1,
+    borderTopColor: "#334155",
+    paddingTop: 12,
+    alignItems: "center",
+  },
+  avgCompletionLabel: {
+    color: "#94a3b8",
+    fontSize: 12,
+    marginBottom: 4,
+  },
+  avgCompletionValue: {
+    color: "white",
+    fontSize: 18,
+    fontWeight: "bold",
   },
   pdfButton: {
     backgroundColor: "#2563eb",
