@@ -1,7 +1,7 @@
 import * as FileSystem from "expo-file-system/legacy";
 import * as Print from "expo-print";
 import * as Sharing from "expo-sharing";
-import { Category, Priority, Task } from "./db";
+import { Category, DayCompletionCount, Priority, Subtask, Task } from "./db";
 
 const PRIORITY_LABELS: Record<Priority, string> = {
   alta: "Alta",
@@ -41,7 +41,27 @@ function isOverdue(iso: string | null, completed: boolean): boolean {
   return iso < today;
 }
 
-function buildHtml(tasks: Task[]): string {
+const WEEKDAY_LABELS = ["D", "L", "M", "X", "J", "V", "S"];
+
+function formatWeekdayLabel(iso: string): string {
+  const [year, month, day] = iso.split("-").map(Number);
+  const date = new Date(year, month - 1, day);
+  return WEEKDAY_LABELS[date.getDay()];
+}
+
+function formatAvgCompletionTime(hours: number | null): string {
+  if (hours === null) return "Sin datos aún";
+  if (hours < 1) return `${Math.round(hours * 60)} min`;
+  if (hours < 48) return `${hours.toFixed(1)} h`;
+  return `${(hours / 24).toFixed(1)} días`;
+}
+
+function buildHtml(
+  tasks: Task[],
+  subtasks: Subtask[],
+  weeklyCompletions: DayCompletionCount[],
+  avgCompletionHours: number | null,
+): string {
   const total = tasks.length;
   const completed = tasks.filter((t) => t.completed).length;
   const pending = total - completed;
@@ -58,9 +78,31 @@ function buildHtml(tasks: Task[]): string {
       ? "No hay tareas registradas en este momento."
       : `Este reporte incluye un total de ${total} tarea${total === 1 ? "" : "s"}, de las cuales ${completed} ${completed === 1 ? "ha sido completada" : "han sido completadas"} y ${pending} ${pending === 1 ? "permanece pendiente" : "permanecen pendientes"}.${overdue > 0 ? ` De las pendientes, ${overdue} ${overdue === 1 ? "se encuentra vencida" : "se encuentran vencidas"}.` : ""}`;
 
+  const maxWeekly = Math.max(1, ...weeklyCompletions.map((d) => d.count));
+  const weeklyBarsHtml = weeklyCompletions
+    .map((d) => {
+      const heightPct = (d.count / maxWeekly) * 100;
+      return `
+        <div class="weekly-bar-col">
+          <span class="weekly-bar-count">${d.count}</span>
+          <div class="weekly-bar-track">
+            <div class="weekly-bar-fill" style="height:${Math.max(heightPct, 4)}%"></div>
+          </div>
+          <span class="weekly-bar-label">${formatWeekdayLabel(d.date)}</span>
+        </div>
+      `;
+    })
+    .join("");
+
   const rows = tasks
     .map((t) => {
       const overdueRow = isOverdue(t.dueDate, t.completed);
+      const taskSubtasks = subtasks.filter((s) => s.taskId === t.id);
+      const completedSubtasks = taskSubtasks.filter((s) => s.completed).length;
+      const subtasksCell =
+        taskSubtasks.length > 0
+          ? `${completedSubtasks}/${taskSubtasks.length}`
+          : "-";
       return `
         <tr>
           <td>${t.text}</td>
@@ -68,6 +110,7 @@ function buildHtml(tasks: Task[]): string {
           <td><span class="badge" style="color:${CATEGORY_COLORS[t.category]}; border-color:${CATEGORY_COLORS[t.category]}">${CATEGORY_LABELS[t.category]}</span></td>
           <td>${formatDisplayDate(t.dueDate)}${overdueRow ? " (vencida)" : ""}</td>
           <td>${t.completed ? "Completada" : "Pendiente"}</td>
+          <td>${subtasksCell}</td>
         </tr>
       `;
     })
@@ -150,6 +193,68 @@ function buildHtml(tasks: Task[]): string {
             font-size: 10px;
             font-weight: bold;
           }
+          .weekly-section {
+            margin-bottom: 26px;
+          }
+          .weekly-section h2 {
+            font-size: 14px;
+            color: #0f172a;
+            margin-bottom: 10px;
+          }
+          .weekly-chart {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            margin-bottom: 14px;
+          }
+          .weekly-bar-col {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+          }
+          .weekly-bar-count {
+            font-size: 9px;
+            color: #64748b;
+            margin-bottom: 3px;
+          }
+          .weekly-bar-track {
+            position: relative;
+            width: 14px;
+            height: 60px;
+            background-color: #f1f5f9;
+            border-radius: 6px;
+            overflow: hidden;
+          }
+          .weekly-bar-fill {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            background-color: #4f46e5;
+            border-radius: 6px;
+          }
+          .weekly-bar-label {
+            font-size: 9px;
+            color: #94a3b8;
+            margin-top: 4px;
+          }
+          .avg-completion {
+            border-top: 1px solid #e2e8f0;
+            padding-top: 10px;
+            text-align: center;
+          }
+          .avg-completion .avg-label {
+            font-size: 10px;
+            color: #64748b;
+            display: block;
+            margin-bottom: 2px;
+          }
+          .avg-completion .avg-value {
+            font-size: 16px;
+            font-weight: bold;
+            color: #0f172a;
+          }
         </style>
       </head>
       <body>
@@ -181,6 +286,17 @@ function buildHtml(tasks: Task[]): string {
           </div>
         </div>
 
+        <div class="weekly-section">
+          <h2>Productividad semanal</h2>
+          <div class="weekly-chart">
+            ${weeklyBarsHtml}
+          </div>
+          <div class="avg-completion">
+            <span class="avg-label">Tiempo promedio en completar una tarea</span>
+            <span class="avg-value">${formatAvgCompletionTime(avgCompletionHours)}</span>
+          </div>
+        </div>
+
         <table>
           <thead>
             <tr>
@@ -189,10 +305,11 @@ function buildHtml(tasks: Task[]): string {
               <th>Categoría</th>
               <th>Fecha límite</th>
               <th>Estado</th>
+              <th>Subtareas</th>
             </tr>
           </thead>
           <tbody>
-            ${rows || '<tr><td colspan="5">No hay tareas registradas.</td></tr>'}
+            ${rows || '<tr><td colspan="6">No hay tareas registradas.</td></tr>'}
           </tbody>
         </table>
       </body>
@@ -200,8 +317,18 @@ function buildHtml(tasks: Task[]): string {
   `;
 }
 
-export async function generateAndShareReport(tasks: Task[]): Promise<void> {
-  const html = buildHtml(tasks);
+export async function generateAndShareReport(
+  tasks: Task[],
+  subtasks: Subtask[],
+  weeklyCompletions: DayCompletionCount[],
+  avgCompletionHours: number | null,
+): Promise<void> {
+  const html = buildHtml(
+    tasks,
+    subtasks,
+    weeklyCompletions,
+    avgCompletionHours,
+  );
   const { base64 } = await Print.printToFileAsync({ html, base64: true });
 
   if (!base64) {

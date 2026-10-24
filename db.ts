@@ -24,6 +24,14 @@ export type CategoryCount = { category: Category; count: number };
 export type PriorityCount = { priority: Priority; count: number };
 export type DayCompletionCount = { date: string; count: number };
 
+export type Subtask = {
+  id: number;
+  taskId: number;
+  text: string;
+  completed: boolean;
+  position: number;
+};
+
 const db = SQLite.openDatabaseSync("tareas.db");
 
 export function initDatabase() {
@@ -50,6 +58,16 @@ export function initDatabase() {
   ensureColumn("dueDate", "TEXT DEFAULT NULL");
   ensureColumn("createdAt", "TEXT DEFAULT NULL");
   ensureColumn("completedAt", "TEXT DEFAULT NULL");
+
+  db.execSync(`
+    CREATE TABLE IF NOT EXISTS subtasks (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      taskId INTEGER NOT NULL,
+      text TEXT NOT NULL,
+      completed INTEGER NOT NULL DEFAULT 0,
+      position INTEGER NOT NULL
+    );
+  `);
 }
 
 export function getAllTasks(): Task[] {
@@ -157,6 +175,42 @@ export function getAvgCompletionHours(): number | null {
   return row?.avgHours ?? null;
 }
 
+export function getAllSubtasks(): Subtask[] {
+  const rows = db.getAllSync<any>(
+    "SELECT * FROM subtasks ORDER BY position ASC;",
+  );
+  return rows.map((r) => ({
+    id: r.id,
+    taskId: r.taskId,
+    text: r.text,
+    completed: r.completed === 1,
+    position: r.position,
+  }));
+}
+
+export function addSubtaskDb(taskId: number, text: string) {
+  const maxPos = db.getFirstSync<any>(
+    "SELECT MAX(position) as maxPos FROM subtasks WHERE taskId = ?;",
+    [taskId],
+  );
+  const nextPos = (maxPos?.maxPos ?? -1) + 1;
+  db.runSync(
+    "INSERT INTO subtasks (taskId, text, completed, position) VALUES (?, ?, 0, ?);",
+    [taskId, text, nextPos],
+  );
+}
+
+export function toggleSubtaskComplete(id: number, completed: boolean) {
+  db.runSync("UPDATE subtasks SET completed = ? WHERE id = ?;", [
+    completed ? 1 : 0,
+    id,
+  ]);
+}
+
+export function deleteSubtaskDb(id: number) {
+  db.runSync("DELETE FROM subtasks WHERE id = ?;", [id]);
+}
+
 export function addTaskDb(
   text: string,
   priority: Priority,
@@ -201,5 +255,6 @@ export function toggleTaskComplete(id: number, completed: boolean) {
 }
 
 export function deleteTaskDb(id: number) {
+  db.runSync("DELETE FROM subtasks WHERE taskId = ?;", [id]);
   db.runSync("DELETE FROM tasks WHERE id = ?;", [id]);
 }

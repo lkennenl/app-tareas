@@ -15,6 +15,7 @@ import {
   Priority,
   PriorityCount,
   TaskStats,
+  getAllSubtasks,
   getAllTasks,
   getAvgCompletionHours,
   getCompletedThisWeek,
@@ -109,7 +110,13 @@ export default function ReportsScreen() {
         );
         return;
       }
-      await generateAndShareReport(tasks);
+      const subtasks = getAllSubtasks();
+      await generateAndShareReport(
+        tasks,
+        subtasks,
+        weeklyCompletions,
+        avgCompletionHours,
+      );
     } catch (error) {
       console.error("Error al generar el reporte:", error);
       Alert.alert("Error", "No se pudo generar el reporte. Intenta de nuevo.");

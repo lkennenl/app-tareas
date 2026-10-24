@@ -14,13 +14,18 @@ import {
 import {
   Category,
   Priority,
+  Subtask,
   Task,
   TaskStats,
+  addSubtaskDb,
   addTaskDb,
+  deleteSubtaskDb,
   deleteTaskDb,
+  getAllSubtasks,
   getAllTasks,
   getTaskStats,
   initDatabase,
+  toggleSubtaskComplete,
   toggleTaskComplete,
   updateTaskDueDate,
   updateTaskText,
@@ -88,10 +93,14 @@ export default function HomeScreen() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [filter, setFilter] = useState<CategoryFilter>("todas");
   const [formExpanded, setFormExpanded] = useState(false);
+  const [subtasks, setSubtasks] = useState<Subtask[]>([]);
+  const [expandedTaskId, setExpandedTaskId] = useState<number | null>(null);
+  const [newSubtaskText, setNewSubtaskText] = useState("");
 
   const loadTasks = () => {
     setTasks(getAllTasks());
     setStats(getTaskStats());
+    setSubtasks(getAllSubtasks());
   };
 
   useFocusEffect(
@@ -119,6 +128,28 @@ export default function HomeScreen() {
 
   const toggleComplete = (id: number, current: boolean) => {
     toggleTaskComplete(id, !current);
+    loadTasks();
+  };
+
+  const toggleExpanded = (taskId: number) => {
+    setExpandedTaskId((prev) => (prev === taskId ? null : taskId));
+    setNewSubtaskText("");
+  };
+
+  const addSubtask = (taskId: number) => {
+    if (newSubtaskText.trim() === "") return;
+    addSubtaskDb(taskId, newSubtaskText.trim());
+    setNewSubtaskText("");
+    loadTasks();
+  };
+
+  const toggleSubtask = (id: number, current: boolean) => {
+    toggleSubtaskComplete(id, !current);
+    loadTasks();
+  };
+
+  const deleteSubtask = (id: number) => {
+    deleteSubtaskDb(id);
     loadTasks();
   };
 
@@ -406,105 +437,191 @@ export default function HomeScreen() {
         keyExtractor={(item) => item.id.toString()}
         renderItem={({ item }) => {
           const overdue = isOverdue(item.dueDate, item.completed);
+          const itemSubtasks = subtasks.filter((s) => s.taskId === item.id);
+          const completedSubtasks = itemSubtasks.filter(
+            (s) => s.completed,
+          ).length;
+          const isExpanded = expandedTaskId === item.id;
           return (
-            <View style={styles.taskRow}>
+            <View style={styles.taskCard}>
               <View
-                style={[
-                  styles.priorityBar,
-                  { backgroundColor: PRIORITY_COLORS[item.priority] },
-                ]}
-              />
-
-              <TouchableOpacity
-                style={[
-                  styles.checkbox,
-                  item.completed && styles.checkboxChecked,
-                ]}
-                onPress={() => toggleComplete(item.id, item.completed)}
-                activeOpacity={0.8}
+                style={[styles.taskRow, isExpanded && styles.taskRowExpanded]}
               >
-                {item.completed && <Text style={styles.checkIcon}>✓</Text>}
-              </TouchableOpacity>
-
-              <View style={styles.task}>
-                <Text
+                <View
                   style={[
-                    styles.taskText,
-                    item.completed && styles.taskCompleted,
+                    styles.priorityBar,
+                    { backgroundColor: PRIORITY_COLORS[item.priority] },
                   ]}
+                />
+
+                <TouchableOpacity
+                  style={[
+                    styles.checkbox,
+                    item.completed && styles.checkboxChecked,
+                  ]}
+                  onPress={() => toggleComplete(item.id, item.completed)}
+                  activeOpacity={0.8}
                 >
-                  {item.text}
-                </Text>
-                <View style={styles.tagsRow}>
+                  {item.completed && <Text style={styles.checkIcon}>✓</Text>}
+                </TouchableOpacity>
+
+                <View style={styles.task}>
                   <Text
                     style={[
-                      styles.tagText,
-                      { color: PRIORITY_COLORS[item.priority] },
+                      styles.taskText,
+                      item.completed && styles.taskCompleted,
                     ]}
                   >
-                    {PRIORITY_LABELS[item.priority]}
+                    {item.text}
                   </Text>
-                  <Text style={styles.tagSeparator}>•</Text>
-                  <Text
-                    style={[
-                      styles.tagText,
-                      { color: CATEGORY_COLORS[item.category] },
-                    ]}
-                  >
-                    {CATEGORY_LABELS[item.category]}
-                  </Text>
-                  {item.dueDate && (
-                    <>
-                      <Text style={styles.tagSeparator}>•</Text>
-                      <Text
-                        style={[styles.tagText, overdue && styles.overdueText]}
+                  <View style={styles.tagsRow}>
+                    <Text
+                      style={[
+                        styles.tagText,
+                        { color: PRIORITY_COLORS[item.priority] },
+                      ]}
+                    >
+                      {PRIORITY_LABELS[item.priority]}
+                    </Text>
+                    <Text style={styles.tagSeparator}>•</Text>
+                    <Text
+                      style={[
+                        styles.tagText,
+                        { color: CATEGORY_COLORS[item.category] },
+                      ]}
+                    >
+                      {CATEGORY_LABELS[item.category]}
+                    </Text>
+                    {item.dueDate && (
+                      <>
+                        <Text style={styles.tagSeparator}>•</Text>
+                        <Text
+                          style={[
+                            styles.tagText,
+                            overdue && styles.overdueText,
+                          ]}
+                        >
+                          {formatDisplayDate(item.dueDate)}
+                        </Text>
+                      </>
+                    )}
+                  </View>
+                  {overdue && (
+                    <View style={styles.overdueRow}>
+                      <Text style={styles.overdueLabel}>Vencida</Text>
+                      <TouchableOpacity
+                        onPress={() => startRescheduling(item.id)}
                       >
-                        {formatDisplayDate(item.dueDate)}
-                      </Text>
-                    </>
+                        <Text style={styles.rescheduleText}>Reprogramar</Text>
+                      </TouchableOpacity>
+                    </View>
                   )}
                 </View>
-                {overdue && (
-                  <View style={styles.overdueRow}>
-                    <Text style={styles.overdueLabel}>Vencida</Text>
-                    <TouchableOpacity
-                      onPress={() => startRescheduling(item.id)}
+
+                <View style={styles.actions}>
+                  <TouchableOpacity
+                    style={styles.actionButton}
+                    onPress={() => {
+                      if (!item.completed) {
+                        startEditing(item);
+                      }
+                    }}
+                    activeOpacity={item.completed ? 1 : 0.7}
+                    disabled={item.completed}
+                  >
+                    <Text
+                      style={[
+                        styles.editText,
+                        item.completed && { opacity: 0.3 },
+                      ]}
                     >
-                      <Text style={styles.rescheduleText}>Reprogramar</Text>
-                    </TouchableOpacity>
+                      Editar
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[styles.actionButton, styles.deleteButton]}
+                    onPress={() => deleteTask(item.id)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.deleteText}>Eliminar</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              <TouchableOpacity
+                style={styles.subtasksToggle}
+                onPress={() => toggleExpanded(item.id)}
+              >
+                <Text style={styles.subtasksToggleText}>
+                  {itemSubtasks.length > 0
+                    ? `${completedSubtasks}/${itemSubtasks.length} subtareas`
+                    : "Subtareas"}
+                </Text>
+                {itemSubtasks.length > 0 && (
+                  <View style={styles.subtasksMiniBarTrack}>
+                    <View
+                      style={[
+                        styles.subtasksMiniBarFill,
+                        {
+                          width: `${(completedSubtasks / itemSubtasks.length) * 100}%`,
+                        },
+                      ]}
+                    />
                   </View>
                 )}
-              </View>
+                <Text style={styles.subtasksToggleIcon}>
+                  {isExpanded ? "▲" : "▼"}
+                </Text>
+              </TouchableOpacity>
 
-              <View style={styles.actions}>
-                <TouchableOpacity
-                  style={styles.actionButton}
-                  onPress={() => {
-                    if (!item.completed) {
-                      startEditing(item);
-                    }
-                  }}
-                  activeOpacity={item.completed ? 1 : 0.7}
-                  disabled={item.completed}
-                >
-                  <Text
-                    style={[
-                      styles.editText,
-                      item.completed && { opacity: 0.3 },
-                    ]}
-                  >
-                    Editar
-                  </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[styles.actionButton, styles.deleteButton]}
-                  onPress={() => deleteTask(item.id)}
-                  activeOpacity={0.7}
-                >
-                  <Text style={styles.deleteText}>Eliminar</Text>
-                </TouchableOpacity>
-              </View>
+              {isExpanded && (
+                <View style={styles.subtasksPanel}>
+                  {itemSubtasks.map((s) => (
+                    <View key={s.id} style={styles.subtaskRow}>
+                      <TouchableOpacity
+                        style={[
+                          styles.subtaskCheckbox,
+                          s.completed && styles.subtaskCheckboxChecked,
+                        ]}
+                        onPress={() => toggleSubtask(s.id, s.completed)}
+                        activeOpacity={0.8}
+                      >
+                        {s.completed && (
+                          <Text style={styles.subtaskCheckIcon}>✓</Text>
+                        )}
+                      </TouchableOpacity>
+                      <Text
+                        style={[
+                          styles.subtaskText,
+                          s.completed && styles.subtaskTextCompleted,
+                        ]}
+                      >
+                        {s.text}
+                      </Text>
+                      <TouchableOpacity onPress={() => deleteSubtask(s.id)}>
+                        <Text style={styles.subtaskDeleteText}>✕</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                  <View style={styles.subtaskInputRow}>
+                    <TextInput
+                      style={styles.subtaskInput}
+                      placeholder="Nueva subtarea..."
+                      placeholderTextColor="#64748b"
+                      value={newSubtaskText}
+                      onChangeText={setNewSubtaskText}
+                      onSubmitEditing={() => addSubtask(item.id)}
+                    />
+                    <TouchableOpacity
+                      style={styles.subtaskAddButton}
+                      onPress={() => addSubtask(item.id)}
+                    >
+                      <Text style={styles.subtaskAddButtonText}>+</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              )}
             </View>
           );
         }}
@@ -690,14 +807,124 @@ const styles = StyleSheet.create({
   filterChipTextActive: {
     color: "white",
   },
+  taskCard: {
+    marginBottom: 12,
+  },
   taskRow: {
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: "#1e293b",
     borderRadius: 12,
-    marginBottom: 12,
     paddingVertical: 12,
     paddingHorizontal: 12,
+  },
+  taskRowExpanded: {
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
+  },
+  subtasksToggle: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#16213a",
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    gap: 10,
+  },
+  subtasksToggleText: {
+    color: "#94a3b8",
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  subtasksMiniBarTrack: {
+    flex: 1,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: "#0f172a",
+    overflow: "hidden",
+  },
+  subtasksMiniBarFill: {
+    height: "100%",
+    borderRadius: 3,
+    backgroundColor: "#4f46e5",
+  },
+  subtasksToggleIcon: {
+    color: "#64748b",
+    fontSize: 10,
+  },
+  subtasksPanel: {
+    backgroundColor: "#16213a",
+    borderBottomLeftRadius: 12,
+    borderBottomRightRadius: 12,
+    paddingHorizontal: 14,
+    paddingTop: 4,
+    paddingBottom: 12,
+  },
+  subtaskRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  subtaskCheckbox: {
+    width: 18,
+    height: 18,
+    borderRadius: 5,
+    borderWidth: 1.5,
+    borderColor: "#4f46e5",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 10,
+  },
+  subtaskCheckboxChecked: {
+    backgroundColor: "#4f46e5",
+    borderColor: "#4f46e5",
+  },
+  subtaskCheckIcon: {
+    color: "white",
+    fontSize: 11,
+    fontWeight: "bold",
+  },
+  subtaskText: {
+    flex: 1,
+    color: "#e2e8f0",
+    fontSize: 14,
+  },
+  subtaskTextCompleted: {
+    textDecorationLine: "line-through",
+    color: "#64748b",
+  },
+  subtaskDeleteText: {
+    color: "#64748b",
+    fontSize: 13,
+    paddingHorizontal: 6,
+  },
+  subtaskInputRow: {
+    flexDirection: "row",
+    gap: 8,
+    marginTop: 4,
+  },
+  subtaskInput: {
+    flex: 1,
+    backgroundColor: "#0f172a",
+    color: "white",
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    fontSize: 13,
+    borderWidth: 1,
+    borderColor: "#334155",
+  },
+  subtaskAddButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    backgroundColor: "#4f46e5",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  subtaskAddButtonText: {
+    color: "white",
+    fontSize: 18,
+    fontWeight: "bold",
   },
   priorityBar: {
     width: 4,
